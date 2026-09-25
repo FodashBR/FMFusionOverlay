@@ -143,7 +143,8 @@ public class CaptureOverlayService extends Service {
             double min = 1;
             for (int i=0;i<5;i++) { hand[i]=matches[i].cardId; min=Math.min(min,matches[i].score); }
             List<FusionEngine.FusionPath> fusions = FusionEngine.find(gameData, hand);
-            main.post(() -> showResults(matches, fusions, min));
+            final double confidence = min;
+            main.post(() -> showResults(matches, fusions, confidence));
         } catch (Exception e) {
             showError("Erro na análise: " + e.getMessage());
         } finally {
