@@ -192,6 +192,7 @@ public class MainActivity extends Activity {
                 }));
                 File tmp = new File(getFilesDir(), "fm_cache.tmp");
                 gd.save(tmp);
+                GameData.load(tmp); // Validate extracted fusion data before replacing the cache.
                 if (cacheFile.exists() && !cacheFile.delete()) throw new IOException("Não foi possível substituir o cache antigo");
                 if (!tmp.renameTo(cacheFile)) throw new IOException("Não foi possível salvar o índice");
                 runOnUiThread(() -> {
@@ -214,8 +215,23 @@ public class MainActivity extends Activity {
     }
 
     private void updateStatus() {
-        if (cacheFile.exists()) status.setText("✓ Dados do jogo já indexados");
-        else status.setText("Aguardando a ROM do jogo");
+        if (!cacheFile.exists()) { status.setText("Aguardando os dados do jogo"); return; }
+        startButton.setEnabled(false);
+        status.setText("Conferindo dados de fusão…");
+        exec.submit(() -> {
+            try {
+                GameData.load(cacheFile);
+                runOnUiThread(() -> {
+                    status.setText("✓ Dados do jogo já indexados");
+                    startButton.setEnabled(true);
+                });
+            } catch (IOException e) {
+                runOnUiThread(() -> {
+                    status.setText("Dados antigos inválidos: importe o novo .fmf corrigido");
+                    startButton.setEnabled(false);
+                });
+            }
+        });
     }
 
     private TextView text(String s, int sp, boolean bold) {

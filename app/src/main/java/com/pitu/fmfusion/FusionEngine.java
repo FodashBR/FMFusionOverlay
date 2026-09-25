@@ -18,6 +18,19 @@ public final class FusionEngine {
             chain[0] = hand[i];
             dfs(gd, hand, used, hand[i], chain, 1, unique);
         }
+        return sorted(gd, unique);
+    }
+
+    // The existing field card is the first ingredient. Only hand cards can follow it.
+    public static List<FusionPath> findFromField(GameData gd, int fieldCard, int[] hand) {
+        LinkedHashMap<String,FusionPath> unique = new LinkedHashMap<>();
+        int[] chain = new int[hand.length + 1];
+        chain[0] = fieldCard;
+        dfs(gd, hand, new boolean[hand.length], fieldCard, chain, 1, unique);
+        return sorted(gd, unique);
+    }
+
+    private static List<FusionPath> sorted(GameData gd, LinkedHashMap<String,FusionPath> unique) {
         ArrayList<FusionPath> out = new ArrayList<>(unique.values());
         out.sort((a,b) -> {
             int d = Integer.compare(gd.cards[b.result].attack, gd.cards[a.result].attack);

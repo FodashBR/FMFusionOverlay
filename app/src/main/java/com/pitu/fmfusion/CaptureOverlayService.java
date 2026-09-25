@@ -44,6 +44,7 @@ public class CaptureOverlayService extends Service {
     private Bitmap lastCapture;
     // Field positions are chosen by the player; a hand capture alone cannot reveal placement.
     private final int[] ownField = {-1, -1, -1, -1, -1};
+    private final boolean[] playedHandSlot = new boolean[5];
     private CardRecognizer.Match[] lastMatches;
 
     @Override public void onCreate() {
@@ -158,6 +159,7 @@ public class CaptureOverlayService extends Service {
                 if (lastCapture != null) lastCapture.recycle();
                 lastCapture = preview;
                 lastMatches = matches;
+                Arrays.fill(playedHandSlot,false);
                 showResults(matches, fusions, confidence);
             });
         } catch (Exception e) {
@@ -210,7 +212,7 @@ public class CaptureOverlayService extends Service {
         TextView title=tv("Fusões disponíveis",20,true); box.addView(title);
         StringBuilder handText=new StringBuilder("Mão reconhecida:\n");
         for(int i=0;i<5;i++) handText.append(i+1).append(". ").append(gameData.cards[m[i].cardId].name)
-                .append(String.format(Locale.US,"  (%.0f%%)\n",Math.max(0,m[i].score)*100));
+                .append(playedHandSlot[i] ? "  (jogada)\n" : String.format(Locale.US,"  (%.0f%%)\n",Math.max(0,m[i].score)*100));
         TextView hand=tv(handText.toString().trim(),14,false); hand.setTextColor(Color.LTGRAY); box.addView(hand,marginTop(8));
         TextView captureSize=tv("Captura: " + capW + " × " + capH,12,false);
         captureSize.setTextColor(Color.LTGRAY);box.addView(captureSize,marginTop(5));
@@ -233,12 +235,57 @@ public class CaptureOverlayService extends Service {
         Button reset=new Button(this); reset.setAllCaps(false); reset.setText("Novo duelo · limpar mesa");
         reset.setOnClickListener(v -> {
             Arrays.fill(ownField,-1);
-            showCurrentResults();
+            Arrays.fill(playedHandSlot,false);
+            lastMatches=null;
+            removePanel();
+            Toast.makeText(this,"Mesa limpa. Toque em FM para ler a nova mão.",Toast.LENGTH_SHORT).show();
         });
         box.addView(reset,marginTop(4));
 
+        int[] availableHand=activeHand();
+        boolean anyFieldFusion=false;
+        box.addView(tv("Fusões com cartas da mesa",16,true),marginTop(12));
+        for (int slot=0;slot<ownField.length;slot++) {
+            if (ownField[slot]<0) continue;
+            List<FusionEngine.FusionPath> paths=FusionEngine.findFromField(gameData,ownField[slot],availableHand);
+            if (paths.isEmpty()) continue;
+            anyFieldFusion=true;
+            int limit=Math.min(6,paths.size());
+            for (int i=0;i<limit;i++) {
+                FusionEngine.FusionPath fp=paths.get(i);
+                StringBuilder s=new StringBuilder("Mesa ").append(slot+1).append(": ")
+                        .append(gameData.cards[fp.chain[0]].name);
+                for(int j=1;j<fp.chain.length;j++) s.append(" + ").append(gameData.cards[fp.chain[j]].name);
+                GameData.Card result=gameData.cards[fp.result];
+                s.append("\n→ ").append(result.name).append("  ").append(result.attack).append("/").append(result.defense);
+                s.append("\nToque após realizar para atualizar a mesa");
+                TextView row=tv(s.toString(),14,i==0);
+                row.setPadding(dp(5),dp(6),dp(5),dp(6));
+                row.setBackgroundColor(Color.argb(60,120,105,180));
+                final int position=slot;
+                row.setOnClickListener(v -> {
+                    // Account for each physical hand slot, even when two cards have the same ID.
+                    for(int j=1;j<fp.chain.length;j++) {
+                        for(int k=0;k<5;k++) {
+                            if(!playedHandSlot[k] && lastMatches[k].cardId==fp.chain[j]) {
+                                playedHandSlot[k]=true;
+                                break;
+                            }
+                        }
+                    }
+                    ownField[position]=fp.result;
+                    showCurrentResults();
+                });
+                box.addView(row,marginTop(6));
+            }
+            if(paths.size()>limit) box.addView(tv("+ "+(paths.size()-limit)+" outras para a posição "+(slot+1),12,false));
+        }
+        if (!anyFieldFusion) box.addView(tv("Nenhuma fusão entre sua mesa registrada e a mão disponível.",14,false),marginTop(5));
+
+        box.addView(tv("Fusões apenas com a mão",16,true),marginTop(12));
+
         if(fusions.isEmpty()) {
-            box.addView(tv("Nenhuma fusão encontrada entre essas 5 cartas.",16,true),marginTop(14));
+            box.addView(tv("Nenhuma fusão encontrada entre as cartas disponíveis na mão.",14,false),marginTop(5));
         } else {
             int limit=Math.min(10,fusions.size());
             for(int i=0;i<limit;i++) {
@@ -268,9 +315,18 @@ public class CaptureOverlayService extends Service {
 
     private void showCurrentResults() {
         if (lastMatches==null) return;
-        int[] ids=new int[5]; double min=1;
-        for (int i=0;i<5;i++) { ids[i]=lastMatches[i].cardId; min=Math.min(min,lastMatches[i].score); }
-        showResults(lastMatches,FusionEngine.find(gameData,ids),min);
+        double min=1;
+        for (CardRecognizer.Match match:lastMatches) min=Math.min(min,match.score);
+        showResults(lastMatches,FusionEngine.find(gameData,activeHand()),min);
+    }
+
+    private int[] activeHand() {
+        if (lastMatches==null) return new int[0];
+        int count=0;
+        for(boolean played:playedHandSlot) if(!played) count++;
+        int[] ids=new int[count]; int k=0;
+        for(int i=0;i<5;i++) if(!playedHandSlot[i]) ids[k++]=lastMatches[i].cardId;
+        return ids;
     }
 
     private void showPlacementPanel(int position) {
@@ -285,11 +341,14 @@ public class CaptureOverlayService extends Service {
         box.addView(tv("Toque na carta que você colocou nessa posição.",13,false),marginTop(6));
         if (lastMatches!=null) {
             for (int i=0;i<lastMatches.length;i++) {
+                if (playedHandSlot[i]) continue;
+                final int handSlot=i;
                 final int id=lastMatches[i].cardId;
                 Button card=new Button(this); card.setAllCaps(false);
                 card.setText((i+1) + ". " + gameData.cards[id].name);
                 card.setOnClickListener(v -> {
                     ownField[position]=id;
+                    playedHandSlot[handSlot]=true;
                     showCurrentResults();
                 });
                 box.addView(card,marginTop(4));

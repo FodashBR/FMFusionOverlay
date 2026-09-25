@@ -79,6 +79,8 @@ public final class GameData {
                     c.fusions.put(material, result);
                 }
             }
+            if (gd.fusionResult(3,15) != 68)
+                throw new IOException("Dados de fusão incorretos. Importe o novo arquivo .fmf corrigido.");
             return gd;
         }
     }
