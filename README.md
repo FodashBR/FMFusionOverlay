@@ -21,6 +21,7 @@ por número usando um catálogo de referência.
 - Usa MediaProjection para capturar a tela do Android.
 - Usa o layout 4:3 do Forbidden Memories e busca pequenas variações de posição das cinco cartas antes de comparar as miniaturas.
 - Mostra um botão flutuante `FM`; ao tocar, exibe as fusões e cadeias possíveis, ordenadas por ATK do resultado.
+- Permite registrar manualmente qual carta da mão foi colocada em cada uma das cinco posições da sua mesa, retirar cartas e limpar a mesa ao começar outro duelo. Esse registro dura enquanto o assistente estiver em execução.
 - Não envia a tela ou a ROM para a internet.
 
 ## Compatibilidade inicial
@@ -43,7 +44,9 @@ Também há um workflow em `.github/workflows/build-apk.yml` que compila `app-de
 6. Abra o DuckStation e entre num duelo.
 7. Com as cinco cartas visíveis, toque no botão flutuante **FM**.
 8. Se a identificação ficar errada, toque em **Salvar captura para ajuste** e compartilhe a imagem salva em `Imagens/FM Fusion Overlay` para calibração. A imagem é salva no celular somente quando você pedir.
+9. Antes de atualizar a captura da mão, toque numa posição vazia da mesa e escolha a carta que jogou. Toque numa posição ocupada para remover a carta quando ela sair do campo. Ao começar outro duelo, use **Novo duelo · limpar mesa**.
 
 ## Observações
 
 Este é um MVP e pode precisar de pequenos ajustes de posição/limiar em filtros gráficos específicos do DuckStation. O app usa dados extraídos da ROM do próprio usuário e não distribui ROM, BIOS ou artes do jogo.
+O registro da mesa ainda depende da seleção do jogador: a captura de uma mão, sozinha, não informa em qual casa a carta foi jogada. A lista de fusões continua calculada para as cinco cartas reconhecidas da mão; recomendações de jogada contra cartas do adversário ainda não foram implementadas.

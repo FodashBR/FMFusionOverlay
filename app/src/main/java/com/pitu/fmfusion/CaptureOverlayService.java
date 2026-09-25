@@ -42,6 +42,9 @@ public class CaptureOverlayService extends Service {
     private Handler main;
     private int capW, capH, density;
     private Bitmap lastCapture;
+    // Field positions are chosen by the player; a hand capture alone cannot reveal placement.
+    private final int[] ownField = {-1, -1, -1, -1, -1};
+    private CardRecognizer.Match[] lastMatches;
 
     @Override public void onCreate() {
         super.onCreate();
@@ -154,6 +157,7 @@ public class CaptureOverlayService extends Service {
             main.post(() -> {
                 if (lastCapture != null) lastCapture.recycle();
                 lastCapture = preview;
+                lastMatches = matches;
                 showResults(matches, fusions, confidence);
             });
         } catch (Exception e) {
@@ -212,6 +216,27 @@ public class CaptureOverlayService extends Service {
         captureSize.setTextColor(Color.LTGRAY);box.addView(captureSize,marginTop(5));
         if(minScore<0.45){ TextView warn=tv("⚠ Uma ou mais cartas podem estar erradas. Confira a mão reconhecida; se preciso, salve a captura para ajuste.",13,true); warn.setTextColor(Color.rgb(255,190,90)); box.addView(warn,marginTop(8)); }
 
+        box.addView(tv("Suas cartas na mesa (registro manual)",16,true),marginTop(12));
+        for (int slot=0; slot<ownField.length; slot++) {
+            final int position=slot;
+            String label = (slot+1) + ". " + (ownField[slot]<0 ? "Vazia" : gameData.cards[ownField[slot]].name);
+            Button fieldButton=new Button(this); fieldButton.setAllCaps(false);
+            fieldButton.setText(label + (ownField[slot]<0 ? "" : "  ·  Remover"));
+            fieldButton.setOnClickListener(v -> {
+                if (ownField[position]>=0) {
+                    ownField[position]=-1;
+                    showCurrentResults();
+                } else showPlacementPanel(position);
+            });
+            box.addView(fieldButton,marginTop(2));
+        }
+        Button reset=new Button(this); reset.setAllCaps(false); reset.setText("Novo duelo · limpar mesa");
+        reset.setOnClickListener(v -> {
+            Arrays.fill(ownField,-1);
+            showCurrentResults();
+        });
+        box.addView(reset,marginTop(4));
+
         if(fusions.isEmpty()) {
             box.addView(tv("Nenhuma fusão encontrada entre essas 5 cartas.",16,true),marginTop(14));
         } else {
@@ -234,11 +259,51 @@ public class CaptureOverlayService extends Service {
         save.setOnClickListener(v->saveDiagnosticCapture());box.addView(save,marginTop(4));
         ScrollView sc=new ScrollView(this);sc.addView(box);panel=sc;
         int w=Math.min(screenSize()[0]-dp(28),dp(620));
-        WindowManager.LayoutParams lp=new WindowManager.LayoutParams(w,WindowManager.LayoutParams.WRAP_CONTENT,
+        WindowManager.LayoutParams lp=new WindowManager.LayoutParams(w,Math.min(screenSize()[1]-dp(28),dp(620)),
                 Build.VERSION.SDK_INT>=26?WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY:WindowManager.LayoutParams.TYPE_PHONE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         lp.gravity=Gravity.CENTER; wm.addView(sc,lp);
+    }
+
+    private void showCurrentResults() {
+        if (lastMatches==null) return;
+        int[] ids=new int[5]; double min=1;
+        for (int i=0;i<5;i++) { ids[i]=lastMatches[i].cardId; min=Math.min(min,lastMatches[i].score); }
+        showResults(lastMatches,FusionEngine.find(gameData,ids),min);
+    }
+
+    private void showPlacementPanel(int position) {
+        removePanel();
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16),dp(14),dp(16),dp(14));
+        GradientDrawable bg=new GradientDrawable();
+        bg.setColor(Color.argb(248,20,20,28)); bg.setCornerRadius(dp(16));
+        box.setBackground(bg);
+        box.addView(tv("Posição " + (position+1) + " da sua mesa",18,true));
+        box.addView(tv("Toque na carta que você colocou nessa posição.",13,false),marginTop(6));
+        if (lastMatches!=null) {
+            for (int i=0;i<lastMatches.length;i++) {
+                final int id=lastMatches[i].cardId;
+                Button card=new Button(this); card.setAllCaps(false);
+                card.setText((i+1) + ". " + gameData.cards[id].name);
+                card.setOnClickListener(v -> {
+                    ownField[position]=id;
+                    showCurrentResults();
+                });
+                box.addView(card,marginTop(4));
+            }
+        }
+        Button cancel=new Button(this);cancel.setText("Voltar");cancel.setAllCaps(false);
+        cancel.setOnClickListener(v -> showCurrentResults());box.addView(cancel,marginTop(8));
+        ScrollView sc=new ScrollView(this);sc.addView(box);panel=sc;
+        int w=Math.min(screenSize()[0]-dp(28),dp(620));
+        WindowManager.LayoutParams lp=new WindowManager.LayoutParams(w,Math.min(screenSize()[1]-dp(28),dp(620)),
+                Build.VERSION.SDK_INT>=26?WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY:WindowManager.LayoutParams.TYPE_PHONE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT);
+        lp.gravity=Gravity.CENTER;wm.addView(sc,lp);
     }
 
     private TextView tv(String s,int sp,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(sp);t.setTextColor(Color.WHITE);if(bold)t.setTypeface(Typeface.DEFAULT_BOLD);return t;}
