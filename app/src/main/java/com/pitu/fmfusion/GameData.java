@@ -72,8 +72,11 @@ public final class GameData {
                 in.readFully(c.thumbGray);
                 c.thumbSmall = downsample2(c.thumbGray, THUMB_W, THUMB_H);
                 int nf = in.readInt();
+                if (nf < 0 || nf > CARD_COUNT) throw new IOException("Quantidade de fusões inválida");
                 for (int j = 0; j < nf; j++) {
-                    c.fusions.put(in.readUnsignedShort(), in.readUnsignedShort());
+                    int material = in.readUnsignedShort(), result = in.readUnsignedShort();
+                    if (material >= CARD_COUNT || result >= CARD_COUNT) throw new IOException("ID de carta inválido");
+                    c.fusions.put(material, result);
                 }
             }
             return gd;

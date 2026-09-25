@@ -2,10 +2,21 @@
 
 Assistente Android experimental para **Yu-Gi-Oh! Forbidden Memories (PS1)** rodando no DuckStation.
 
+## Edição Europe SLES_039.47 (CHD)
+
+No caso da edição Europe em CHD, importe o arquivo `.fmf` preparado a partir do disco do usuário.
+O DuckStation continua usando o CHD original; o app armazena apenas os dados necessários
+para identificar as 722 cartas e consultar suas fusões. O arquivo `.fmf` contém miniaturas
+extraídas da cópia do usuário e deve ser mantido privado, fora do repositório público.
+As miniaturas dessa edição usam blocos de 0x4000 bytes e começam em 0x169000 + 0x3560
+no `WA_MRG.MRG`. As regras de fusão ficam em 0xB87800; os atributos ficam no
+executável SLES_039.47 em 0x1C4A44. O nome das cartas no arquivo `.fmf` foi associado
+por número usando um catálogo de referência.
+
 ## O que faz
 
-- Lê localmente a ROM BIN/ISO escolhida pelo usuário.
-- Extrai `SLUS_014.11` e `WA_MRG.MRG` diretamente do ISO9660 do disco.
+- Importa um arquivo `.fmf` da edição Europe ou lê uma ROM BIN/ISO NTSC-U escolhida pelo usuário.
+- Para a opção NTSC-U BIN/ISO, extrai `SLUS_014.11` e `WA_MRG.MRG` diretamente do ISO9660 do disco.
 - Gera as 722 miniaturas 40x32 e carrega a tabela de fusões da própria ROM.
 - Usa MediaProjection para capturar a tela do Android.
 - Assume o layout padrão 4:3 do Forbidden Memories e reconhece as 5 artes da mão por correlação de miniaturas.
@@ -14,7 +25,7 @@ Assistente Android experimental para **Yu-Gi-Oh! Forbidden Memories (PS1)** roda
 
 ## Compatibilidade inicial
 
-A primeira versão foi escrita para a edição NTSC-U que contém `SLUS_014.11`. O layout de reconhecimento foi calibrado com DuckStation em tela cheia e viewport 4:3 usando as posições nativas das cartas `(x=30+60*n, y=157, 40x32)`.
+O suporte à edição europeia foi conferido com uma captura da partida em DuckStation. O layout de reconhecimento usa viewport 4:3 e as posições nativas das cartas `(x=30+60*n, y=157, 40x32)`, com busca de pequenos deslocamentos. A precisão em outras telas ou filtros gráficos ainda precisa ser testada no aparelho.
 
 ## Compilar
 
@@ -25,7 +36,7 @@ Também há um workflow em `.github/workflows/build-apk.yml` que compila `app-de
 ## Instalação / uso
 
 1. Instale o APK.
-2. Abra o app e escolha o mesmo `.bin`/`.iso` usado pelo DuckStation.
+2. Para a edição Europe em CHD, importe o `.fmf` fornecido separadamente. Para NTSC-U, selecione o `.bin`/`.iso`.
 3. Aguarde `722 cartas prontas`.
 4. Conceda a permissão de sobreposição.
 5. Toque em **Iniciar assistente** e aceite a captura de tela.

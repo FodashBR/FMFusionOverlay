@@ -20,6 +20,7 @@ public class MainActivity extends Activity {
     private static final int REQ_ROM = 1001;
     private static final int REQ_CAPTURE = 1002;
     private static final int REQ_NOTIF = 1003;
+    private static final int REQ_DATA = 1004;
 
     private TextView status;
     private ProgressBar progress;
@@ -54,9 +55,13 @@ public class MainActivity extends Activity {
         progress.setMax(100); progress.setVisibility(View.GONE);
         root.addView(progress, lpTop(10));
 
-        Button rom = button("1. Selecionar ROM do Forbidden Memories (.bin/.iso)");
+        Button data = button("1. Importar dados da edição Europe (.fmf)");
+        data.setOnClickListener(v -> chooseData());
+        root.addView(data, lpTop(22));
+
+        Button rom = button("Outra opção: ROM americana (.bin/.iso)");
         rom.setOnClickListener(v -> chooseRom());
-        root.addView(rom, lpTop(22));
+        root.addView(rom, lpTop(12));
 
         Button overlay = button("2. Permitir botão flutuante");
         overlay.setOnClickListener(v -> {
@@ -76,7 +81,8 @@ public class MainActivity extends Activity {
 
         TextView help = text(
                 "Como usar:\n\n" +
-                "• Na primeira vez, selecione o mesmo BIN/ISO que você usa no DuckStation. O app extrai localmente as 722 miniaturas e as regras de fusão.\n\n" +
+                "• Para a edição Europe em CHD, importe o arquivo .fmf gerado a partir do seu disco. O CHD continua no DuckStation; você só precisa importar os dados uma vez.\n\n" +
+                "• Para a edição americana, também é possível selecionar o BIN/ISO.\n\n" +
                 "• Inicie o assistente e aceite a captura de tela. Depois abra o DuckStation.\n\n" +
                 "• Quando as 5 cartas estiverem na mão, toque no botão flutuante “FM”. Ele reconhece as cartas e mostra as fusões possíveis.\n\n" +
                 "Nada da sua tela é enviado para a internet.", 15, false);
@@ -90,6 +96,13 @@ public class MainActivity extends Activity {
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("*/*");
         startActivityForResult(i, REQ_ROM);
+    }
+
+    private void chooseData() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        startActivityForResult(i, REQ_DATA);
     }
 
     private void startAssistant() {
@@ -115,6 +128,8 @@ public class MainActivity extends Activity {
         super.onActivityResult(req, result, data);
         if (req == REQ_ROM && result == RESULT_OK && data != null && data.getData() != null) {
             indexRom(data.getData());
+        } else if (req == REQ_DATA && result == RESULT_OK && data != null && data.getData() != null) {
+            importData(data.getData());
         } else if (req == REQ_CAPTURE && result == RESULT_OK && data != null) {
             Intent s = new Intent(this, CaptureOverlayService.class);
             s.putExtra(CaptureOverlayService.EXTRA_RESULT_CODE, result);
@@ -123,6 +138,42 @@ public class MainActivity extends Activity {
             toast("Assistente iniciado. Abra o DuckStation e toque em FM quando quiser analisar a mão.");
             moveTaskToBack(true);
         }
+    }
+
+    private void importData(Uri uri) {
+        progress.setVisibility(View.VISIBLE);
+        startButton.setEnabled(false);
+        status.setText("Importando dados…");
+        exec.submit(() -> {
+            File tmp = new File(getFilesDir(), "fm_cache.tmp");
+            try (InputStream in = getContentResolver().openInputStream(uri);
+                 OutputStream out = new BufferedOutputStream(new FileOutputStream(tmp))) {
+                if (in == null) throw new IOException("Não foi possível abrir o arquivo");
+                byte[] buffer = new byte[16384];
+                int n;
+                while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+                out.flush();
+                GameData.load(tmp); // Validate every card and fusion before replacing the previous data.
+                if (cacheFile.exists() && !cacheFile.delete()) throw new IOException("Não foi possível substituir os dados antigos");
+                if (!tmp.renameTo(cacheFile)) throw new IOException("Não foi possível guardar os dados");
+                runOnUiThread(() -> {
+                    progress.setVisibility(View.GONE);
+                    startButton.setEnabled(true);
+                    status.setText("✓ Dados europeus importados: 722 cartas prontas");
+                    toast("Dados importados. Inicie o assistente.");
+                });
+            } catch (Exception e) {
+                tmp.delete();
+                runOnUiThread(() -> {
+                    progress.setVisibility(View.GONE);
+                    startButton.setEnabled(true);
+                    status.setText("Erro na importação: " + e.getMessage());
+                    new AlertDialog.Builder(this).setTitle("Não consegui importar os dados")
+                            .setMessage(e.getMessage() + "\n\nSelecione o arquivo .fmf da edição Europe SLES_039.47.")
+                            .setPositiveButton("OK", null).show();
+                });
+            }
+        });
     }
 
     private void indexRom(Uri uri) {

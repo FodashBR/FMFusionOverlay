@@ -29,19 +29,24 @@ public final class CardRecognizer {
     }
 
     private static Match recognizeOne(Bitmap bm, GameData gd, float vx,float vy,float vw,float vh,int nx,int ny) {
-        // Stage 1: fixed position at 20x16; keep 8 best.
-        byte[] patchSmall = sampleGray(bm, vx,vy,vw,vh, nx,ny,40,32,20,16);
+        // DuckStation may shift a card a few source pixels depending on display scaling.
+        // Search coarse offsets before discarding candidates.
         PriorityQueue<Match> top = new PriorityQueue<>(Comparator.comparingDouble(a -> a.score));
+        byte[][] patches = new byte[12][];
+        int k = 0;
+        for (int dy=-1;dy<=2;dy++) for(int dx=0;dx<=4;dx+=2)
+            patches[k++] = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,20,16);
         for (int c=0;c<GameData.CARD_COUNT;c++) {
-            double s = ncc(patchSmall, gd.cards[c].thumbSmall);
-            if (top.size()<8) top.add(new Match(c,s));
+            double s = -2;
+            for (byte[] patch : patches) s = Math.max(s, ncc(patch, gd.cards[c].thumbSmall));
+            if (top.size()<12) top.add(new Match(c,s));
             else if (s > top.peek().score) { top.poll(); top.add(new Match(c,s)); }
         }
         ArrayList<Match> cand = new ArrayList<>(top);
         Match best = new Match(-1,-2);
         // Stage 2: full resolution, small offset search around expected native pixel.
         for (Match m : cand) {
-            for (int dy=-2; dy<=2; dy++) for (int dx=-2; dx<=2; dx++) {
+            for (int dy=-2; dy<=3; dy++) for (int dx=-2; dx<=5; dx++) {
                 byte[] p = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,40,32);
                 double s = ncc(p, gd.cards[m.cardId].thumbGray);
                 if (s > best.score) best = new Match(m.cardId,s);
