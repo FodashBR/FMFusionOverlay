@@ -7,7 +7,11 @@ public final class CardRecognizer {
     public static final class Match {
         public int cardId;
         public double score;
-        public Match(int id, double s) { cardId=id; score=s; }
+        public int dx, dy;
+        public Match(int id, double s) { this(id, s, 0, 0); }
+        public Match(int id, double s, int dx, int dy) {
+            cardId=id; score=s; this.dx=dx; this.dy=dy;
+        }
     }
 
     private static final int[] X_NATIVE = {30, 90, 150, 210, 270};
@@ -29,27 +33,36 @@ public final class CardRecognizer {
     }
 
     private static Match recognizeOne(Bitmap bm, GameData gd, float vx,float vy,float vw,float vh,int nx,int ny) {
-        // DuckStation may shift a card a few source pixels depending on display scaling.
-        // Search coarse offsets before discarding candidates.
+        // DuckStation may place the 4:3 viewport off-center in landscape mode.
+        // Search positions at low resolution before comparing full-size art.
         PriorityQueue<Match> top = new PriorityQueue<>(Comparator.comparingDouble(a -> a.score));
-        byte[][] patches = new byte[12][];
+        byte[][] patches = new byte[95][];
+        int[] offsetsX = new int[95], offsetsY = new int[95];
         int k = 0;
-        for (int dy=-1;dy<=2;dy++) for(int dx=0;dx<=4;dx+=2)
-            patches[k++] = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,20,16);
+        for (int dy=-3;dy<=5;dy+=2) for(int dx=-18;dx<=18;dx+=2) {
+            patches[k] = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,10,8);
+            offsetsX[k]=dx; offsetsY[k]=dy; k++;
+        }
         for (int c=0;c<GameData.CARD_COUNT;c++) {
             double s = -2;
-            for (byte[] patch : patches) s = Math.max(s, ncc(patch, gd.cards[c].thumbSmall));
-            if (top.size()<12) top.add(new Match(c,s));
-            else if (s > top.peek().score) { top.poll(); top.add(new Match(c,s)); }
+            int bestOffset = 0;
+            byte[] thumbTiny = GameData.downsample2(gd.cards[c].thumbSmall, 20, 16);
+            for (int j=0;j<k;j++) {
+                double score=ncc(patches[j],thumbTiny);
+                if (score>s) { s=score; bestOffset=j; }
+            }
+            Match match=new Match(c,s,offsetsX[bestOffset],offsetsY[bestOffset]);
+            if (top.size()<12) top.add(match);
+            else if (s > top.peek().score) { top.poll(); top.add(match); }
         }
         ArrayList<Match> cand = new ArrayList<>(top);
         Match best = new Match(-1,-2);
-        // Stage 2: full resolution, small offset search around expected native pixel.
+        // Stage 2: full resolution around each candidate's own coarse position.
         for (Match m : cand) {
-            for (int dy=-2; dy<=3; dy++) for (int dx=-2; dx<=5; dx++) {
+            for (int dy=m.dy-2; dy<=m.dy+2; dy++) for (int dx=m.dx-2; dx<=m.dx+2; dx++) {
                 byte[] p = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,40,32);
                 double s = ncc(p, gd.cards[m.cardId].thumbGray);
-                if (s > best.score) best = new Match(m.cardId,s);
+                if (s > best.score) best = new Match(m.cardId,s,dx,dy);
             }
         }
         return best;

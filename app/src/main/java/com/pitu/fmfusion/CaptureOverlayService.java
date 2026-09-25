@@ -11,6 +11,9 @@ import android.media.ImageReader;
 import android.media.projection.*;
 import android.os.*;
 import android.provider.Settings;
+import android.provider.MediaStore;
+import android.content.ContentValues;
+import android.net.Uri;
 import android.view.*;
 import android.widget.*;
 
@@ -38,6 +41,7 @@ public class CaptureOverlayService extends Service {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private Handler main;
     private int capW, capH, density;
+    private Bitmap lastCapture;
 
     @Override public void onCreate() {
         super.onCreate();
@@ -139,12 +143,19 @@ public class CaptureOverlayService extends Service {
     private void analyze(Bitmap bm) {
         try {
             CardRecognizer.Match[] matches = CardRecognizer.recognize(bm, gameData);
+            int previewW = Math.min(bm.getWidth(), 1600);
+            int previewH = Math.round((float)bm.getHeight() * previewW / bm.getWidth());
+            Bitmap preview = Bitmap.createScaledBitmap(bm, previewW, previewH, true);
             int[] hand = new int[5];
             double min = 1;
             for (int i=0;i<5;i++) { hand[i]=matches[i].cardId; min=Math.min(min,matches[i].score); }
             List<FusionEngine.FusionPath> fusions = FusionEngine.find(gameData, hand);
             final double confidence = min;
-            main.post(() -> showResults(matches, fusions, confidence));
+            main.post(() -> {
+                if (lastCapture != null) lastCapture.recycle();
+                lastCapture = preview;
+                showResults(matches, fusions, confidence);
+            });
         } catch (Exception e) {
             showError("Erro na análise: " + e.getMessage());
         } finally {
@@ -197,6 +208,8 @@ public class CaptureOverlayService extends Service {
         for(int i=0;i<5;i++) handText.append(i+1).append(". ").append(gameData.cards[m[i].cardId].name)
                 .append(String.format(Locale.US,"  (%.0f%%)\n",Math.max(0,m[i].score)*100));
         TextView hand=tv(handText.toString().trim(),14,false); hand.setTextColor(Color.LTGRAY); box.addView(hand,marginTop(8));
+        TextView captureSize=tv("Captura: " + capW + " × " + capH,12,false);
+        captureSize.setTextColor(Color.LTGRAY);box.addView(captureSize,marginTop(5));
         if(minScore<0.60){ TextView warn=tv("⚠ Reconhecimento com baixa confiança. Se alguma carta estiver errada, deixe a mão parada e toque em FM de novo.",13,true); warn.setTextColor(Color.rgb(255,190,90)); box.addView(warn,marginTop(8)); }
 
         if(fusions.isEmpty()) {
@@ -217,6 +230,8 @@ public class CaptureOverlayService extends Service {
             if(fusions.size()>10) box.addView(tv("+ "+(fusions.size()-10)+" outras combinações",13,false));
         }
         Button close=new Button(this);close.setText("Fechar");close.setAllCaps(false);close.setOnClickListener(v->removePanel());box.addView(close,marginTop(10));
+        Button save=new Button(this);save.setText("Salvar captura para ajuste");save.setAllCaps(false);
+        save.setOnClickListener(v->saveDiagnosticCapture());box.addView(save,marginTop(4));
         ScrollView sc=new ScrollView(this);sc.addView(box);panel=sc;
         int w=Math.min(screenSize()[0]-dp(28),dp(620));
         WindowManager.LayoutParams lp=new WindowManager.LayoutParams(w,WindowManager.LayoutParams.WRAP_CONTENT,
@@ -230,6 +245,29 @@ public class CaptureOverlayService extends Service {
     private LinearLayout.LayoutParams marginTop(int x){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(x);return p;}
 
     private void showError(String s) { main.post(() -> Toast.makeText(this,s,Toast.LENGTH_LONG).show()); }
+    private void saveDiagnosticCapture() {
+        if (lastCapture == null) { showError("Nenhuma captura disponível"); return; }
+        Bitmap snapshot = lastCapture.copy(Bitmap.Config.ARGB_8888, false);
+        worker.submit(() -> {
+            Uri uri = null;
+            try {
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.Images.Media.DISPLAY_NAME, "FM-Fusion-" + System.currentTimeMillis() + ".png");
+                values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+                values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/FM Fusion Overlay");
+                uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                if (uri == null) throw new IOException("Não foi possível criar o arquivo");
+                try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+                    if (out == null || !snapshot.compress(Bitmap.CompressFormat.PNG, 100, out))
+                        throw new IOException("Não foi possível salvar a imagem");
+                }
+                showError("Captura salva em Imagens/FM Fusion Overlay");
+            } catch (Exception e) {
+                if (uri != null) getContentResolver().delete(uri, null, null);
+                showError("Falha ao salvar captura: " + e.getMessage());
+            } finally { snapshot.recycle(); }
+        });
+    }
     private void removePanel(){ if(panel!=null){try{wm.removeView(panel);}catch(Exception ignored){}panel=null;} }
     private int dp(int x){return Math.round(x*getResources().getDisplayMetrics().density);}
 
@@ -246,6 +284,7 @@ public class CaptureOverlayService extends Service {
         if(imageReader!=null)imageReader.close();
         if(projection!=null)projection.stop();
         worker.shutdownNow();
+        if(lastCapture!=null)lastCapture.recycle();
         super.onDestroy();
     }
 

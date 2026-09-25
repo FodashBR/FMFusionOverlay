@@ -19,7 +19,7 @@ por número usando um catálogo de referência.
 - Para a opção NTSC-U BIN/ISO, extrai `SLUS_014.11` e `WA_MRG.MRG` diretamente do ISO9660 do disco.
 - Gera as 722 miniaturas 40x32 e carrega a tabela de fusões da própria ROM.
 - Usa MediaProjection para capturar a tela do Android.
-- Assume o layout padrão 4:3 do Forbidden Memories e reconhece as 5 artes da mão por correlação de miniaturas.
+- Usa o layout 4:3 do Forbidden Memories e busca pequenas variações de posição das cinco cartas antes de comparar as miniaturas.
 - Mostra um botão flutuante `FM`; ao tocar, exibe as fusões e cadeias possíveis, ordenadas por ATK do resultado.
 - Não envia a tela ou a ROM para a internet.
 
@@ -42,6 +42,7 @@ Também há um workflow em `.github/workflows/build-apk.yml` que compila `app-de
 5. Toque em **Iniciar assistente** e aceite a captura de tela.
 6. Abra o DuckStation e entre num duelo.
 7. Com as cinco cartas visíveis, toque no botão flutuante **FM**.
+8. Se a identificação ficar errada, toque em **Salvar captura para ajuste** e compartilhe a imagem salva em `Imagens/FM Fusion Overlay` para calibração. A imagem é salva no celular somente quando você pedir.
 
 ## Observações
 
