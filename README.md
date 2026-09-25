@@ -23,6 +23,7 @@ por número usando um catálogo de referência.
 - Mostra um botão flutuante `FM`; ao tocar, exibe as fusões e cadeias possíveis, ordenadas por ATK do resultado.
 - Permite registrar manualmente qual carta da mão foi colocada em cada uma das cinco posições da sua mesa, retirar cartas e limpar a mesa ao começar outro duelo. Esse registro dura enquanto o assistente estiver em execução.
 - Compara cada carta registrada na sua mesa com as cartas disponíveis na mão e exibe as fusões possíveis, inclusive cadeias de duas ou mais cartas, com a carta da mesa como primeiro ingrediente.
+- Reconhece automaticamente suas cartas viradas para cima nas cinco casas quando o DuckStation mostra a mesa na visão de cima, com as ilustrações das cartas visíveis. Preserva o registro anterior quando a captura está na visão em perspectiva.
 - Após realizar uma fusão sugerida entre mesa e mão, permite tocar no resultado para substituir a carta registrada naquela posição e marcar os ingredientes da mão como usados.
 - Não envia a tela ou a ROM para a internet.
 
@@ -46,10 +47,11 @@ Também há um workflow em `.github/workflows/build-apk.yml` que compila `app-de
 6. Abra o DuckStation e entre num duelo.
 7. Com as cinco cartas visíveis, toque no botão flutuante **FM**.
 8. Se a identificação ficar errada, toque em **Salvar captura para ajuste** e compartilhe a imagem salva em `Imagens/FM Fusion Overlay` para calibração. A imagem é salva no celular somente quando você pedir.
-9. Antes de atualizar a captura da mão, toque numa posição vazia da mesa e escolha a carta que jogou. Ela passa a ser considerada jogada, sai das combinações da mão e é usada nas fusões com a mesa. Toque numa posição ocupada para remover a carta quando ela sair do campo. Ao começar outro duelo, use **Novo duelo · limpar mesa**.
-10. A seção **Fusões com cartas da mesa** indica a posição e a sequência a usar. Depois de fazer a fusão no jogo, toque no resultado sugerido para atualizar o registro da mesa; caso a mão mude, toque em **FM** para capturá-la novamente.
+9. Com as cartas da mão e da mesa visíveis na visão de cima (como na tela de escolher uma carta do campo), toque em **FM**. Confira os cinco nomes da mão e as cartas reconhecidas nas posições da mesa. Se estiver na visão em perspectiva, o registro da mesa é preservado; na visão de cima, a leitura atualiza as posições.
+10. Se uma carta na mesa for reconhecida incorretamente, toque na posição ocupada para removê-la e toque novamente na posição vazia para escolher uma carta da mão previamente capturada. Para registrar manualmente uma carta da mão que você jogou, toque na posição vazia antes de atualizar a captura; ela sai das combinações da mão e entra nas fusões com a mesa. Ao começar outro duelo, use **Novo duelo · limpar mesa**.
+11. A seção **Fusões mesa + mão** indica a posição e a sequência a usar. Depois de fazer a fusão no jogo, toque no resultado sugerido para atualizar o registro da mesa; caso a mão mude, toque em **FM** para capturá-la novamente.
 
 ## Observações
 
 Este é um MVP e pode precisar de pequenos ajustes de posição/limiar em filtros gráficos específicos do DuckStation. O app usa dados extraídos da ROM do próprio usuário e não distribui ROM, BIOS ou artes do jogo.
-O registro da mesa ainda depende da seleção do jogador: a captura de uma mão, sozinha, não informa em qual casa a carta foi jogada. As fusões com a mesa usam apenas as suas cartas registradas e as cartas disponíveis na última captura da mão. Não é necessário identificar cartas do adversário para consultar fusões próprias.
+A leitura automática da mesa usa a visão de cima e compara miniaturas com as ilustrações visíveis; posições com comparação fraca são tratadas como vazias e podem exigir conferência. Uma carta virada para baixo ou com a ilustração encoberta pode não ser reconhecida. Duas cartas que já estão em casas diferentes da mesa não podem ser fundidas diretamente entre si: o app calcula mesa + mão e mão + mão. Não é necessário identificar cartas do adversário para consultar fusões próprias.

@@ -44,6 +44,8 @@ public class CaptureOverlayService extends Service {
     private Bitmap lastCapture;
     // Field positions are chosen by the player; a hand capture alone cannot reveal placement.
     private final int[] ownField = {-1, -1, -1, -1, -1};
+    private final double[] fieldScores = new double[5];
+    private boolean fieldFromCurrentCapture;
     private final boolean[] playedHandSlot = new boolean[5];
     private CardRecognizer.Match[] lastMatches;
 
@@ -147,6 +149,7 @@ public class CaptureOverlayService extends Service {
     private void analyze(Bitmap bm) {
         try {
             CardRecognizer.Match[] matches = CardRecognizer.recognize(bm, gameData);
+            CardRecognizer.FieldScan fieldScan=CardRecognizer.recognizeOwnField(bm,gameData,matches);
             int previewW = Math.min(bm.getWidth(), 1600);
             int previewH = Math.round((float)bm.getHeight() * previewW / bm.getWidth());
             Bitmap preview = Bitmap.createScaledBitmap(bm, previewW, previewH, true);
@@ -160,6 +163,14 @@ public class CaptureOverlayService extends Service {
                 lastCapture = preview;
                 lastMatches = matches;
                 Arrays.fill(playedHandSlot,false);
+                fieldFromCurrentCapture=fieldScan.topDown;
+                if (fieldScan.topDown) {
+                    for(int i=0;i<5;i++) {
+                        CardRecognizer.Match card=fieldScan.cards[i];
+                        ownField[i]=card==null?-1:card.cardId;
+                        fieldScores[i]=card==null?0:card.score;
+                    }
+                }
                 showResults(matches, fusions, confidence);
             });
         } catch (Exception e) {
@@ -202,7 +213,7 @@ public class CaptureOverlayService extends Service {
         if (analyzing.get()) { Toast.makeText(this,"Já estou analisando…",Toast.LENGTH_SHORT).show(); return; }
         removePanel();
         analyzeRequested.set(true);
-        Toast.makeText(this,"Lendo as 5 cartas…",Toast.LENGTH_SHORT).show();
+        Toast.makeText(this,"Lendo a mão e, se visível, a mesa…",Toast.LENGTH_SHORT).show();
     }
 
     private void showResults(CardRecognizer.Match[] m, List<FusionEngine.FusionPath> fusions, double minScore) {
@@ -218,15 +229,22 @@ public class CaptureOverlayService extends Service {
         captureSize.setTextColor(Color.LTGRAY);box.addView(captureSize,marginTop(5));
         if(minScore<0.45){ TextView warn=tv("⚠ Uma ou mais cartas podem estar erradas. Confira a mão reconhecida; se preciso, salve a captura para ajuste.",13,true); warn.setTextColor(Color.rgb(255,190,90)); box.addView(warn,marginTop(8)); }
 
-        box.addView(tv("Suas cartas na mesa (registro manual)",16,true),marginTop(12));
+        box.addView(tv("Suas cartas na mesa",16,true),marginTop(12));
+        TextView fieldHint=tv(fieldFromCurrentCapture
+                ? "Mesa lida nesta captura. Confira os nomes antes de usar as fusões."
+                : "Para ler a mesa automaticamente, deixe-a na visão de cima e toque em FM. O registro anterior foi mantido.",12,false);
+        fieldHint.setTextColor(Color.LTGRAY);box.addView(fieldHint,marginTop(3));
         for (int slot=0; slot<ownField.length; slot++) {
             final int position=slot;
             String label = (slot+1) + ". " + (ownField[slot]<0 ? "Vazia" : gameData.cards[ownField[slot]].name);
+            if (fieldFromCurrentCapture && fieldScores[slot]>0)
+                label+=String.format(Locale.US,"  (%.0f%%)",fieldScores[slot]*100);
             Button fieldButton=new Button(this); fieldButton.setAllCaps(false);
             fieldButton.setText(label + (ownField[slot]<0 ? "" : "  ·  Remover"));
             fieldButton.setOnClickListener(v -> {
                 if (ownField[position]>=0) {
                     ownField[position]=-1;
+                    fieldScores[position]=0;
                     showCurrentResults();
                 } else showPlacementPanel(position);
             });
@@ -235,6 +253,8 @@ public class CaptureOverlayService extends Service {
         Button reset=new Button(this); reset.setAllCaps(false); reset.setText("Novo duelo · limpar mesa");
         reset.setOnClickListener(v -> {
             Arrays.fill(ownField,-1);
+            Arrays.fill(fieldScores,0);
+            fieldFromCurrentCapture=false;
             Arrays.fill(playedHandSlot,false);
             lastMatches=null;
             removePanel();
@@ -244,7 +264,7 @@ public class CaptureOverlayService extends Service {
 
         int[] availableHand=activeHand();
         boolean anyFieldFusion=false;
-        box.addView(tv("Fusões com cartas da mesa",16,true),marginTop(12));
+        box.addView(tv("Fusões mesa + mão",16,true),marginTop(12));
         for (int slot=0;slot<ownField.length;slot++) {
             if (ownField[slot]<0) continue;
             List<FusionEngine.FusionPath> paths=FusionEngine.findFromField(gameData,ownField[slot],availableHand);
@@ -274,6 +294,7 @@ public class CaptureOverlayService extends Service {
                         }
                     }
                     ownField[position]=fp.result;
+                    fieldScores[position]=0;
                     showCurrentResults();
                 });
                 box.addView(row,marginTop(6));
@@ -281,6 +302,7 @@ public class CaptureOverlayService extends Service {
             if(paths.size()>limit) box.addView(tv("+ "+(paths.size()-limit)+" outras para a posição "+(slot+1),12,false));
         }
         if (!anyFieldFusion) box.addView(tv("Nenhuma fusão entre sua mesa registrada e a mão disponível.",14,false),marginTop(5));
+        box.addView(tv("Cartas que já estão em casas diferentes da mesa não podem se fundir entre si.",12,false),marginTop(5));
 
         box.addView(tv("Fusões apenas com a mão",16,true),marginTop(12));
 
@@ -348,6 +370,7 @@ public class CaptureOverlayService extends Service {
                 card.setText((i+1) + ". " + gameData.cards[id].name);
                 card.setOnClickListener(v -> {
                     ownField[position]=id;
+                    fieldScores[position]=0;
                     playedHandSlot[handSlot]=true;
                     showCurrentResults();
                 });

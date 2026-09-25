@@ -16,6 +16,15 @@ public final class CardRecognizer {
 
     private static final int[] X_NATIVE = {30, 90, 150, 210, 270};
     private static final int Y_NATIVE = 157;
+    private static final int FIELD_Y_NATIVE = 59;
+
+    public static final class FieldScan {
+        public final boolean topDown;
+        public final Match[] cards;
+        public FieldScan(boolean topDown, Match[] cards) {
+            this.topDown=topDown; this.cards=cards;
+        }
+    }
 
     public static Match[] recognize(Bitmap screenshot, GameData gd) {
         int sw = screenshot.getWidth(), sh = screenshot.getHeight();
@@ -32,14 +41,48 @@ public final class CardRecognizer {
         return out;
     }
 
+    public static FieldScan recognizeOwnField(Bitmap screenshot, GameData gd, Match[] hand) {
+        int sw=screenshot.getWidth(), sh=screenshot.getHeight();
+        float vw,vh,vx,vy;
+        if ((float)sw/sh>=4f/3f) {
+            vh=sh;vw=sh*4f/3f;vx=(sw-vw)/2f;vy=0;
+        } else {
+            vw=sw;vh=sw*3f/4f;vx=0;vy=(sh-vh)/2f;
+        }
+        Match[] cards=new Match[5];
+        // In the top-down field view, the selected card's name sits on a dark
+        // strip at y=140. In the perspective view these pixels show the gold board.
+        int left=sampleGray(screenshot,vx,vy,vw,vh,80,140,1,1,1,1)[0]&255;
+        int middle=sampleGray(screenshot,vx,vy,vw,vh,160,140,1,1,1,1)[0]&255;
+        if (left>=100 || middle>=100) return new FieldScan(false,cards);
+
+        int[] offsets=new int[5];
+        for(int i=0;i<5;i++) offsets[i]=hand[i].dx;
+        Arrays.sort(offsets);
+        int globalDx=offsets[2];
+        for(int i=0;i<5;i++) {
+            Match m=recognizeOne(screenshot,gd,vx,vy,vw,vh,
+                    24+60*i+globalDx,FIELD_Y_NATIVE,-8,8,-3,5);
+            // A blank gold square can correlate weakly with unrelated card art.
+            if (m.score>=0.50) cards[i]=m;
+        }
+        return new FieldScan(true,cards);
+    }
+
     private static Match recognizeOne(Bitmap bm, GameData gd, float vx,float vy,float vw,float vh,int nx,int ny) {
+        return recognizeOne(bm,gd,vx,vy,vw,vh,nx,ny,-18,18,-3,5);
+    }
+
+    private static Match recognizeOne(Bitmap bm, GameData gd, float vx,float vy,float vw,float vh,
+                                      int nx,int ny,int minDx,int maxDx,int minDy,int maxDy) {
         // DuckStation may place the 4:3 viewport off-center in landscape mode.
         // Search positions at low resolution before comparing full-size art.
         PriorityQueue<Match> top = new PriorityQueue<>(Comparator.comparingDouble(a -> a.score));
-        byte[][] patches = new byte[95][];
-        int[] offsetsX = new int[95], offsetsY = new int[95];
+        int count=((maxDx-minDx)/2+1)*((maxDy-minDy)/2+1);
+        byte[][] patches = new byte[count][];
+        int[] offsetsX = new int[count], offsetsY = new int[count];
         int k = 0;
-        for (int dy=-3;dy<=5;dy+=2) for(int dx=-18;dx<=18;dx+=2) {
+        for (int dy=minDy;dy<=maxDy;dy+=2) for(int dx=minDx;dx<=maxDx;dx+=2) {
             patches[k] = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,10,8);
             offsetsX[k]=dx; offsetsY[k]=dy; k++;
         }
