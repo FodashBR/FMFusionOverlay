@@ -210,7 +210,7 @@ public class CaptureOverlayService extends Service {
         TextView hand=tv(handText.toString().trim(),14,false); hand.setTextColor(Color.LTGRAY); box.addView(hand,marginTop(8));
         TextView captureSize=tv("Captura: " + capW + " × " + capH,12,false);
         captureSize.setTextColor(Color.LTGRAY);box.addView(captureSize,marginTop(5));
-        if(minScore<0.60){ TextView warn=tv("⚠ Reconhecimento com baixa confiança. Se alguma carta estiver errada, deixe a mão parada e toque em FM de novo.",13,true); warn.setTextColor(Color.rgb(255,190,90)); box.addView(warn,marginTop(8)); }
+        if(minScore<0.45){ TextView warn=tv("⚠ Uma ou mais cartas podem estar erradas. Confira a mão reconhecida; se preciso, salve a captura para ajuste.",13,true); warn.setTextColor(Color.rgb(255,190,90)); box.addView(warn,marginTop(8)); }
 
         if(fusions.isEmpty()) {
             box.addView(tv("Nenhuma fusão encontrada entre essas 5 cartas.",16,true),marginTop(14));

@@ -52,15 +52,21 @@ public final class CardRecognizer {
                 if (score>s) { s=score; bestOffset=j; }
             }
             Match match=new Match(c,s,offsetsX[bestOffset],offsetsY[bestOffset]);
-            if (top.size()<12) top.add(match);
+            if (top.size()<40) top.add(match);
             else if (s > top.peek().score) { top.poll(); top.add(match); }
         }
         ArrayList<Match> cand = new ArrayList<>(top);
         Match best = new Match(-1,-2);
         // Stage 2: full resolution around each candidate's own coarse position.
+        Map<Long,byte[]> fullPatches = new HashMap<>();
         for (Match m : cand) {
             for (int dy=m.dy-2; dy<=m.dy+2; dy++) for (int dx=m.dx-2; dx<=m.dx+2; dx++) {
-                byte[] p = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,40,32);
+                long key = ((long)dx << 32) | (dy & 0xffffffffL);
+                byte[] p = fullPatches.get(key);
+                if (p == null) {
+                    p = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,40,32);
+                    fullPatches.put(key,p);
+                }
                 double s = ncc(p, gd.cards[m.cardId].thumbGray);
                 if (s > best.score) best = new Match(m.cardId,s,dx,dy);
             }
