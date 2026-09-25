@@ -83,15 +83,15 @@ public final class CardRecognizer {
         int[] offsetsX = new int[count], offsetsY = new int[count];
         int k = 0;
         for (int dy=minDy;dy<=maxDy;dy+=2) for(int dx=minDx;dx<=maxDx;dx+=2) {
-            patches[k] = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,10,8);
+            patches[k] = sampleRgb(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,10,8);
             offsetsX[k]=dx; offsetsY[k]=dy; k++;
         }
         for (int c=0;c<GameData.CARD_COUNT;c++) {
             double s = -2;
             int bestOffset = 0;
-            byte[] thumbTiny = GameData.downsample2(gd.cards[c].thumbSmall, 20, 16);
+            byte[] thumbTiny = gd.cards[c].thumbRgbTiny;
             for (int j=0;j<k;j++) {
-                double score=ncc(patches[j],thumbTiny);
+                double score=nccRgb(patches[j],thumbTiny);
                 if (score>s) { s=score; bestOffset=j; }
             }
             Match match=new Match(c,s,offsetsX[bestOffset],offsetsY[bestOffset]);
@@ -107,10 +107,10 @@ public final class CardRecognizer {
                 long key = ((long)dx << 32) | (dy & 0xffffffffL);
                 byte[] p = fullPatches.get(key);
                 if (p == null) {
-                    p = sampleGray(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,40,32);
+                    p = sampleRgb(bm, vx,vy,vw,vh, nx+dx,ny+dy,40,32,40,32);
                     fullPatches.put(key,p);
                 }
-                double s = ncc(p, gd.cards[m.cardId].thumbGray);
+                double s = nccRgb(p, gd.cards[m.cardId].thumbRgb);
                 if (s > best.score) best = new Match(m.cardId,s,dx,dy);
             }
         }
@@ -135,6 +135,23 @@ public final class CardRecognizer {
         return out;
     }
 
+    private static byte[] sampleRgb(Bitmap bm, float vx,float vy,float vw,float vh,
+                                    int nx,int ny,int nw,int nh,int ow,int oh) {
+        byte[] out=new byte[ow*oh*3];
+        int bw=bm.getWidth(),bh=bm.getHeight();
+        for(int y=0;y<oh;y++) {
+            float gy=ny+(y+0.5f)*nh/oh;
+            int sy=clamp(Math.round(vy+gy/240f*vh),0,bh-1);
+            for(int x=0;x<ow;x++) {
+                float gx=nx+(x+0.5f)*nw/ow;
+                int sx=clamp(Math.round(vx+gx/320f*vw),0,bw-1);
+                int pixel=bm.getPixel(sx,sy), p=(y*ow+x)*3;
+                out[p]=(byte)(pixel>>16);out[p+1]=(byte)(pixel>>8);out[p+2]=(byte)pixel;
+            }
+        }
+        return out;
+    }
+
     private static int clamp(int x,int lo,int hi){return Math.max(lo,Math.min(hi,x));}
 
     private static double ncc(byte[] a, byte[] b) {
@@ -145,6 +162,26 @@ public final class CardRecognizer {
         for(int i=0;i<n;i++){
             double x=(a[i]&255)-ma,y=(b[i]&255)-mb;
             num+=x*y;da+=x*x;db+=y*y;
+        }
+        if(da<1e-6||db<1e-6)return -1;
+        return num/Math.sqrt(da*db);
+    }
+
+    private static double nccRgb(byte[] a,byte[] b) {
+        int n=a.length/3;
+        double ar=0,ag=0,ab=0,br=0,bg=0,bb=0;
+        for(int i=0;i<a.length;i+=3) {
+            ar+=a[i]&255;ag+=a[i+1]&255;ab+=a[i+2]&255;
+            br+=b[i]&255;bg+=b[i+1]&255;bb+=b[i+2]&255;
+        }
+        ar/=n;ag/=n;ab/=n;br/=n;bg/=n;bb/=n;
+        double num=0,da=0,db=0;
+        for(int i=0;i<a.length;i+=3) {
+            double xr=(a[i]&255)-ar,xg=(a[i+1]&255)-ag,xb=(a[i+2]&255)-ab;
+            double yr=(b[i]&255)-br,yg=(b[i+1]&255)-bg,yb=(b[i+2]&255)-bb;
+            num+=xr*yr+xg*yg+xb*yb;
+            da+=xr*xr+xg*xg+xb*xb;
+            db+=yr*yr+yg*yg+yb*yb;
         }
         if(da<1e-6||db<1e-6)return -1;
         return num/Math.sqrt(da*db);

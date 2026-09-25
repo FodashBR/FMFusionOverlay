@@ -55,17 +55,16 @@ public final class RomParser {
             int start = base + i*stride;
             int palette = start + pxCount;
             if (palette + 512 > mrg.length) throw new IOException("MRG terminou durante as miniaturas");
-            byte[] gray = gd.cards[i].thumbGray;
+            byte[] rgb = gd.cards[i].thumbRgb;
             for (int j = 0; j < pxCount; j++) {
                 int idx = mrg[start+j] & 0xff;
                 int c = u16(mrg, palette + idx*2);
                 int r = (c & 31) * 8;
                 int g = ((c >>> 5) & 31) * 8;
                 int b = ((c >>> 10) & 31) * 8;
-                int y = (77*r + 150*g + 29*b) >>> 8;
-                gray[j] = (byte)y;
+                rgb[j*3]=(byte)r; rgb[j*3+1]=(byte)g; rgb[j*3+2]=(byte)b;
             }
-            gd.cards[i].thumbSmall = GameData.downsample2(gray, 40, 32);
+            GameData.prepareThumbnails(gd.cards[i]);
             if (progress != null && i % 72 == 0) progress.onProgress(45 + (i*35/CARD_COUNT), "Miniaturas: " + i + "/722");
         }
     }

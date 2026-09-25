@@ -17,9 +17,9 @@ por número usando um catálogo de referência.
 
 - Importa um arquivo `.fmf` da edição Europe ou lê uma ROM BIN/ISO NTSC-U escolhida pelo usuário.
 - Para a opção NTSC-U BIN/ISO, extrai `SLUS_014.11` e `WA_MRG.MRG` diretamente do ISO9660 do disco.
-- Gera as 722 miniaturas 40x32 e carrega a tabela de fusões da própria ROM.
+- Gera as 722 miniaturas coloridas 40x32 (FMF2) e carrega a tabela de fusões da própria ROM.
 - Usa MediaProjection para capturar a tela do Android.
-- Usa o layout 4:3 do Forbidden Memories e busca pequenas variações de posição das cinco cartas antes de comparar as miniaturas.
+- Usa o layout 4:3 do Forbidden Memories e busca pequenas variações de posição das cinco cartas antes de comparar as miniaturas RGB. A cor evita confusões entre ilustrações com silhuetas semelhantes.
 - Mostra um botão flutuante `FM`; ao tocar, exibe as fusões e cadeias possíveis, ordenadas por ATK do resultado.
 - Permite registrar manualmente qual carta da mão foi colocada em cada uma das cinco posições da sua mesa, retirar cartas e limpar a mesa ao começar outro duelo. Esse registro dura enquanto o assistente estiver em execução.
 - Compara cada carta registrada na sua mesa com as cartas disponíveis na mão e exibe as fusões possíveis, inclusive cadeias de duas ou mais cartas, com a carta da mesa como primeiro ingrediente.
@@ -40,7 +40,7 @@ Também há um workflow em `.github/workflows/build-apk.yml` que compila `app-de
 ## Instalação / uso
 
 1. Instale o APK.
-2. Para a edição Europe em CHD, importe o `.fmf` fornecido separadamente. Para NTSC-U, selecione o `.bin`/`.iso`. O cache europeu antigo, gerado antes da correção da tabela de fusões, é rejeitado; importe o arquivo com nome `-corrigido.fmf`.
+2. Para a edição Europe em CHD, importe o `.fmf` fornecido separadamente. Para NTSC-U, selecione o `.bin`/`.iso`. A versão 0.8 exige o arquivo europeu `-cores.fmf`: caches antigos em tons de cinza são rejeitados com mensagem de erro.
 3. Aguarde `722 cartas prontas`.
 4. Conceda a permissão de sobreposição.
 5. Toque em **Iniciar assistente** e aceite a captura de tela.

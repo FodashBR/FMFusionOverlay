@@ -55,7 +55,7 @@ public class MainActivity extends Activity {
         progress.setMax(100); progress.setVisibility(View.GONE);
         root.addView(progress, lpTop(10));
 
-        Button data = button("1. Importar dados da edição Europe (.fmf)");
+        Button data = button("1. Importar dados Europe com cores (.fmf)");
         data.setOnClickListener(v -> chooseData());
         root.addView(data, lpTop(22));
 
@@ -81,7 +81,7 @@ public class MainActivity extends Activity {
 
         TextView help = text(
                 "Como usar:\n\n" +
-                "• Para a edição Europe em CHD, importe o arquivo .fmf gerado a partir do seu disco. O CHD continua no DuckStation; você só precisa importar os dados uma vez.\n\n" +
+                "• Para a edição Europe em CHD, importe o novo arquivo -cores.fmf gerado a partir do seu disco. O CHD continua no DuckStation; você só precisa importar os dados uma vez.\n\n" +
                 "• Para a edição americana, também é possível selecionar o BIN/ISO.\n\n" +
                 "• Inicie o assistente e aceite a captura de tela. Depois abra o DuckStation.\n\n" +
                 "• Quando as 5 cartas estiverem na mão, toque no botão flutuante “FM”. Ele reconhece as cartas e mostra as fusões possíveis.\n\n" +
